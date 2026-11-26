@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/xpresstoparadise/coop-cli/internal/api"
 	"github.com/xpresstoparadise/coop-cli/internal/core"
 	"github.com/xpresstoparadise/coop-cli/internal/gitroom"
 	"github.com/xpresstoparadise/coop-cli/internal/local"
@@ -84,7 +85,13 @@ func openOnServer(ctx context.Context, env *Env, root, server, key, slug string,
 	if id, err := local.Load(root, room.Sides[0]); err == nil {
 		return fmt.Errorf("side %s here is already in room %q (remove .coop/%s.json to leave it)", id.Side, id.Slug, id.Side)
 	}
-	resp, err := serverroom.Create(ctx, server, key, room.Topic, room.TurnBudget)
+	o := newOut(env, core.Human)
+	var resp *api.CreateResponse
+	err := o.spin("opening the room on "+server+"…", func() error {
+		var err error
+		resp, err = serverroom.Create(ctx, server, key, room.Topic, room.TurnBudget)
+		return err
+	})
 	if err != nil {
 		return err
 	}
@@ -95,6 +102,12 @@ func openOnServer(ctx context.Context, env *Env, root, server, key, slug string,
 		AgentToken: resp.Credentials.AgentToken, HumanToken: resp.Credentials.HumanToken}
 	if err := id.Save(root); err != nil {
 		return err
+	}
+	if o.on {
+		o.println(o.u.OK(fmt.Sprintf("opened %s on %s as side %s", o.u.Bold(room.Topic), o.u.Dim(server), o.u.Side(id.Side))))
+		o.println(o.u.Invitation(resp.Invitation))
+		o.println(o.u.Hint("send it to the other side; then `coop watch` to follow the room"))
+		return nil
 	}
 	fmt.Fprintf(env.Stdout, "opened room %q on %s as side %s\n", room.Topic, server, id.Side)
 	fmt.Fprintf(env.Stdout, "send this single-use invitation to the other side (it is a secret):\n\n  %s\n\n", resp.Invitation)
@@ -108,7 +121,14 @@ func joinOnServer(ctx context.Context, env *Env, root, invitation string) error 
 	if id, err := local.Load(root, "B"); err == nil {
 		return fmt.Errorf("side B here is already in room %q (remove .coop/B.json to leave it)", id.Slug)
 	}
-	server, resp, err := serverroom.Join(ctx, invitation)
+	o := newOut(env, core.Human)
+	var server string
+	var resp *api.JoinResponse
+	err := o.spin("joining…", func() error {
+		var err error
+		server, resp, err = serverroom.Join(ctx, invitation)
+		return err
+	})
 	if err != nil {
 		return err
 	}
@@ -125,7 +145,11 @@ func joinOnServer(ctx context.Context, env *Env, root, invitation string) error 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(env.Stdout, "joined room %q on %s as side %s\n", resp.Room.Topic, server, side)
-	fmt.Fprintln(env.Stdout, header(st, id, core.Human))
+	o.say(fmt.Sprintf("joined room %q on %s as side %s", resp.Room.Topic, server, side),
+		o.u.OK("joined as side "+o.u.Side(side)+o.u.Dim(" on "+server)))
+	o.header(st, id, core.Human)
+	if o.on {
+		o.println(o.u.Hint("connect your agent here with `coop setup <agent>`, follow with `coop watch`"))
+	}
 	return nil
 }

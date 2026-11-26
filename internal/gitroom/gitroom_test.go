@@ -73,7 +73,7 @@ func TestDecodeCRLF(t *testing.T) {
 }
 
 func TestSlugify(t *testing.T) {
-	for in, want := range map[string]string{"Orders export": "orders-export", "  API v2 / auth!! ": "api-v2-auth", "Привет": "room"} {
+	for in, want := range map[string]string{"Orders export": "orders-export", "  API v2 / auth!! ": "api-v2-auth", "Экспорт заказов (тест 1)": "eksport-zakazov-test-1", "日本": "room"} {
 		if got := Slugify(in); got != want {
 			t.Errorf("Slugify(%q) = %q, want %q", in, got, want)
 		}

@@ -45,6 +45,9 @@ func cmdWatch(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if env.pretty() && env.IsTTY() {
+		return runWatchTUI(ctx, env, s)
+	}
 	ctx, quit := context.WithCancel(ctx)
 	defer quit()
 

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	xterm "github.com/charmbracelet/x/term"
+
 	"github.com/xpresstoparadise/coop-cli/internal/core"
 	"github.com/xpresstoparadise/coop-cli/internal/gitroom"
 	"github.com/xpresstoparadise/coop-cli/internal/local"
@@ -72,6 +74,8 @@ type Env struct {
 	Stdout, Stderr io.Writer
 	Dir            string      // working folder
 	IsTTY          func() bool // stdin is an interactive terminal
+	StdoutTTY      func() bool // stdout is a terminal (styled output allowed)
+	Width          func() int  // terminal width, 0 if unknown
 }
 
 // OSEnv is the environment of the running process.
@@ -83,12 +87,21 @@ func OSEnv() Env {
 			fi, err := os.Stdin.Stat()
 			return err == nil && fi.Mode()&os.ModeCharDevice != 0
 		},
+		StdoutTTY: func() bool { return xterm.IsTerminal(os.Stdout.Fd()) },
+		Width: func() int {
+			w, _, err := xterm.GetSize(os.Stdout.Fd())
+			if err != nil {
+				return 0
+			}
+			return w
+		},
 	}
 }
 
 // Run runs the command line args (without the program name) and returns an
 // exit code.
 func Run(ctx context.Context, env Env, args []string) int {
+	enableVT()
 	if len(args) == 0 {
 		fmt.Fprint(env.Stderr, usage)
 		return 2
@@ -112,9 +125,11 @@ func Run(ctx context.Context, env Env, args []string) int {
 		}
 		var ce *core.Error
 		if errors.As(err, &ce) {
-			fmt.Fprintf(env.Stderr, "coop: refused (%s): %s\n", ce.Code, ce.Msg)
+			// Keep text that callers wrapped around the rule, such as hints.
+			extra := strings.TrimPrefix(err.Error(), ce.Error())
+			fmt.Fprintln(env.Stderr, failText(&env, ce.Code, ce.Msg, extra))
 		} else {
-			fmt.Fprintf(env.Stderr, "coop: %v\n", err)
+			fmt.Fprintln(env.Stderr, failText(&env, "", err.Error(), ""))
 		}
 		return 1
 	}
@@ -160,6 +175,7 @@ type session struct {
 	id    *local.Identity
 	room  backend
 	actor core.Actor
+	out   *out
 }
 
 func (s *session) seen() int {
@@ -215,12 +231,18 @@ func openSession(ctx context.Context, env *Env, sf sessionFlags) (*session, erro
 	if err != nil {
 		return nil, err
 	}
-	return &session{env: env, root: root, id: id, room: room, actor: actor}, nil
+	return &session{env: env, root: root, id: id, room: room, actor: actor, out: newOut(env, actor)}, nil
 }
 
 func (s *session) post(ctx context.Context, m core.Message) error {
 	m.Side, m.Actor = s.id.Side, s.actor
-	out, st, err := s.room.Post(ctx, m, s.seen())
+	var out core.Message
+	var st *core.State
+	err := s.out.spin("sending "+string(m.Kind)+"…", func() error {
+		var err error
+		out, st, err = s.room.Post(ctx, m, s.seen())
+		return err
+	})
 	if err != nil {
 		if errors.Is(err, core.ErrUnreadHuman) {
 			return fmt.Errorf("%w — run `coop read --agent` first", err)
@@ -231,14 +253,16 @@ func (s *session) post(ctx context.Context, m core.Message) error {
 	if err := s.markSeen(out.Seq); err != nil {
 		return err
 	}
-	fmt.Fprintf(s.env.Stdout, "posted #%d %s\n", out.Seq, out.Kind)
+	s.out.posted(out)
 	if err := s.saveAgreement(st); err != nil {
 		return err
 	}
 	if st.Closed && st.CloseReason == "approved" {
-		fmt.Fprintf(s.env.Stdout, "both sides approved; agreement saved to %s\n", agreementPath(s.root, s.id))
+		p := agreementPath(s.root, s.id)
+		s.out.say("both sides approved; agreement saved to "+p,
+			s.out.u.Banner(st)+"\n"+s.out.u.OK("agreement saved to "+s.out.u.Code(p)))
 	}
-	fmt.Fprintln(s.env.Stdout, hint(st, s.id.Side, s.actor))
+	s.out.hint(st, s.id.Side, s.actor)
 	return nil
 }
 
@@ -295,13 +319,15 @@ func cmdOpen(ctx context.Context, env *Env, args []string) error {
 	if err := id.Save(root); err != nil {
 		return err
 	}
-	fmt.Fprintf(env.Stdout, "opened room %q in coop/%s as side %s\n", *topic, *slug, side)
 	join := "coop join " + *slug
 	if *remote {
 		join += " --remote"
 	}
-	fmt.Fprintf(env.Stdout, "the other side runs: %s\n", join)
-	fmt.Fprintln(env.Stdout, "(in this same folder: COOP_SIDE=B "+join+")")
+	o := newOut(env, core.Human)
+	o.say(fmt.Sprintf("opened room %q in coop/%s as side %s", *topic, *slug, side),
+		o.u.OK(fmt.Sprintf("opened %s in %s as side %s", o.u.Bold(*topic), o.u.Code("coop/"+*slug), o.u.Side(side))))
+	o.say("the other side runs: "+join, "  👉 the other side runs: "+o.u.Code(join))
+	o.say("(in this same folder: COOP_SIDE=B "+join+")", o.u.Dim("     in this same folder: COOP_SIDE=B "+join))
 	return nil
 }
 
@@ -358,8 +384,9 @@ func cmdJoin(ctx context.Context, env *Env, args []string) error {
 	if err := id.Save(root); err != nil {
 		return err
 	}
-	fmt.Fprintf(env.Stdout, "joined room %q as side %s\n", r.Topic, *side)
-	fmt.Fprintln(env.Stdout, header(st, id, core.Human))
+	o := newOut(env, core.Human)
+	o.say(fmt.Sprintf("joined room %q as side %s", r.Topic, *side), o.u.OK("joined as side "+o.u.Side(*side)))
+	o.header(st, id, core.Human)
 	return nil
 }
 
@@ -382,9 +409,9 @@ func cmdStatus(ctx context.Context, env *Env, args []string) error {
 			unread++
 		}
 	}
-	fmt.Fprintln(env.Stdout, header(st, s.id, s.actor))
-	fmt.Fprintf(env.Stdout, "unread: %d\n", unread)
-	fmt.Fprintln(env.Stdout, hint(st, s.id.Side, s.actor))
+	s.out.header(st, s.id, s.actor)
+	s.out.say(fmt.Sprintf("unread: %d", unread), s.out.u.Dim(fmt.Sprintf("📬 unread: %d", unread)))
+	s.out.hint(st, s.id.Side, s.actor)
 	return nil
 }
 
@@ -402,18 +429,18 @@ func cmdRead(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(env.Stdout, header(st, s.id, s.actor))
+	s.out.header(st, s.id, s.actor)
 	n := 0
 	for _, m := range log {
 		if *all || m.Seq > s.seen() {
-			fmt.Fprint(env.Stdout, format(m))
+			s.out.message(m, s.id.Side, !*all && !s.mine(m))
 			n++
 		}
 	}
 	if n == 0 {
-		fmt.Fprintln(env.Stdout, "no new messages")
+		s.out.say("no new messages", s.out.u.Dim("📭 no new messages"))
 	}
-	fmt.Fprintln(env.Stdout, hint(st, s.id.Side, s.actor))
+	s.out.hint(st, s.id.Side, s.actor)
 	return s.markSeen(st.LastSeq)
 }
 
@@ -429,7 +456,13 @@ func cmdWait(ctx context.Context, env *Env, args []string) error {
 	}
 	wctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
-	fresh, st, err := s.room.Wait(wctx, s.seen(), s.mine)
+	var fresh []core.Message
+	var st *core.State
+	err = s.out.spin("waiting for the other side…", func() error {
+		var err error
+		fresh, st, err = s.room.Wait(wctx, s.seen(), s.mine)
+		return err
+	})
 	if err != nil {
 		return err
 	}
@@ -440,13 +473,14 @@ func cmdWait(ctx context.Context, env *Env, args []string) error {
 		return ctx.Err()
 	}
 	for _, m := range fresh {
-		fmt.Fprint(env.Stdout, format(m))
+		s.out.message(m, s.id.Side, true)
 	}
 	if len(fresh) == 0 && !st.Closed {
-		fmt.Fprintf(env.Stdout, "no new messages after %s; call wait again\n", *timeout)
+		s.out.say(fmt.Sprintf("no new messages after %s; call wait again", *timeout),
+			s.out.u.Dim(fmt.Sprintf("⌛ nothing new after %s", *timeout)))
 	}
-	fmt.Fprintln(env.Stdout, header(st, s.id, s.actor))
-	fmt.Fprintln(env.Stdout, hint(st, s.id.Side, s.actor))
+	s.out.header(st, s.id, s.actor)
+	s.out.hint(st, s.id.Side, s.actor)
 	if len(fresh) > 0 {
 		return s.markSeen(fresh[len(fresh)-1].Seq)
 	}
@@ -476,7 +510,7 @@ func cmdSay(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 	if strings.TrimSpace(body) == "" {
-		return errors.New("empty message")
+		return errors.New("no message text: put it at the end of the command, in quotes, or use - to read it from stdin")
 	}
 	s, err := openSession(ctx, env, sf)
 	if err != nil {
@@ -552,8 +586,13 @@ func cmdApprove(ctx context.Context, env *Env, args []string) error {
 	if !st.Agreed {
 		return core.ErrNoResolution
 	}
-	fmt.Fprintf(env.Stdout, "Resolution #%d by side %s:\n\n%s\n\nApprove it for side %s? Type yes: ",
-		st.Resolution, st.ResolutionSide, st.ResolutionBody(), s.id.Side)
+	if s.out.on {
+		fmt.Fprintln(env.Stdout, s.out.u.Resolution(st, env.width()))
+		fmt.Fprintf(env.Stdout, "\n🤝 Approve it for side %s? %s ", s.out.u.Side(s.id.Side), s.out.u.Accent("type yes ›"))
+	} else {
+		fmt.Fprintf(env.Stdout, "Resolution #%d by side %s:\n\n%s\n\nApprove it for side %s? Type yes: ",
+			st.Resolution, st.ResolutionSide, st.ResolutionBody(), s.id.Side)
+	}
 	line, _ := bufio.NewReader(env.Stdin).ReadString('\n')
 	if strings.TrimSpace(strings.ToLower(line)) != "yes" {
 		return errors.New("not approved")
