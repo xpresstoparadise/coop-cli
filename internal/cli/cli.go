@@ -39,6 +39,9 @@ Usage:
   coop resume                 lift the pause
   coop approve                approve the agreed resolution (asks on a TTY)
   coop close [REASON]         close the room
+  coop watch [--last 20]      follow the room live; type h/r/s/q to act
+  coop export [--format md|json] [-o FILE]
+                              minutes of the room
   coop setup AGENT...|all [--command PATH]
                               connect an agent to coop in this project:
                               claude, cursor, codex, gemini, opencode
@@ -125,6 +128,7 @@ func init() {
 		"open": cmdOpen, "join": cmdJoin, "status": cmdStatus, "read": cmdRead,
 		"wait": cmdWait, "say": cmdSay, "hand": cmdHand, "resume": cmdResume,
 		"approve": cmdApprove, "close": cmdClose, "mcp": cmdMCP, "setup": cmdSetup,
+		"watch": cmdWatch, "export": cmdExport,
 		"serve": cmdServe, "key": cmdKey, "purge": cmdPurge,
 	}
 }

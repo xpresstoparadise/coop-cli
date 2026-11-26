@@ -190,7 +190,9 @@ the PATH (the binary is installed separately):
 - Gemini CLI extension: `gemini-extension.json`.
 - Codex plugin: deferred; `coop setup codex` covers it.
 
-Humans follow the room with `coop watch` in a second terminal. No web UI.
+Humans follow the room with `coop watch` in a second terminal (typing
+`h [reason]`, `r`, `s TEXT` or `q` acts as the human) and save minutes with
+`coop export --format md|json`. No web UI.
 
 ## 8. Build order
 
