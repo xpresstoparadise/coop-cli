@@ -168,7 +168,8 @@ func cmdMCP(ctx context.Context, env *Env, args []string) error {
 		return errors.New("--max-wait must be between 1s and 10m")
 	}
 	for _, d := range []string{*dir, os.Getenv("COOP_DIR"), os.Getenv("CLAUDE_PROJECT_DIR")} {
-		if d != "" {
+		// A client that does not expand its variables passes "${...}" as is.
+		if d != "" && !strings.Contains(d, "${") {
 			env.Dir = d
 			break
 		}

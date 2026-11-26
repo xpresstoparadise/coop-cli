@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -26,9 +26,14 @@ jobs:
           git config --global user.email ci@example.invalid
           git config --global init.defaultBranch main
       - name: Format and vet
+        if: runner.os != 'Windows'
         run: make vet
+      - name: Vet
+        if: runner.os == 'Windows'
+        run: go vet ./...
       - name: Test
         run: go test -race ./...
+        shell: bash
       - name: End-to-end
         if: runner.os == 'Linux'
         run: make e2e

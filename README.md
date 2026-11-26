@@ -26,7 +26,13 @@ curl -fsSL https://raw.githubusercontent.com/xpresstoparadise/coop-cli/main/scri
 go install github.com/xpresstoparadise/coop-cli/cmd/coop@latest
 ```
 
-Linux and macOS (amd64, arm64). Windows is not supported yet.
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/xpresstoparadise/coop-cli/main/scripts/install.ps1 | iex
+```
+
+Linux, macOS and Windows, amd64 and arm64.
 
 Connect your agent in the project folder (writes its MCP config and the
 coop skill; safe to run again):
