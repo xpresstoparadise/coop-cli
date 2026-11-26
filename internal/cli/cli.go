@@ -52,7 +52,8 @@ Usage:
                               minutes of the room
   coop setup AGENT...|all [--command PATH]
                               connect an agent to coop in this project:
-                              claude, cursor, codex, gemini, opencode
+                              claude, cursor, codex, gemini, opencode,
+                              kimi (Kimi Code), zcode (Z.ai)
   coop mcp [--side A|B] [--dir PATH] [--max-wait 5m]
                               serve the agent's tools over MCP (stdio)
 

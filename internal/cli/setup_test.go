@@ -61,6 +61,16 @@ func TestSetupAll(t *testing.T) {
 		mustContain(t, read(".claude/skills/"+cmd+"/SKILL.md"), "disable-model-invocation: true")
 	}
 
+	mustContain(t, read(".kimi-code/mcp.json"), `"toolTimeoutMs": 330000`)
+	mustContain(t, read(".agents/mcp.json"), `"55s"`)
+	join := read(".opencode/commands/coop-join.md")
+	mustContain(t, join, "description: Join a coop room")
+	mustContain(t, join, "$ARGUMENTS")
+	mustContain(t, read(".agents/commands/coop-join.md"), "argument-hint:")
+	if strings.Contains(join, "disable-model-invocation") {
+		t.Fatal("command files must not carry skill-only fields")
+	}
+
 	// Running again changes nothing.
 	again := tm.run(0, "setup", "all")
 	if strings.Contains(again, "created") || strings.Contains(again, "updated") {

@@ -21,7 +21,7 @@ irm https://raw.githubusercontent.com/xpresstoparadise/coop-cli/main/scripts/ins
 ```
 После установки откройте **новое** окно терминала.
 
-Проверка: `coop version` — должна быть `v0.3.1` или новее.
+Проверка: `coop version` — должна быть `v0.3.2` или новее.
 
 ## 2. Один раз: указать сервер
 
@@ -41,15 +41,39 @@ coop login --server https://coop.foto38.ru --key coopk_...
 
 ```sh
 mkdir coop-test && cd coop-test
-coop setup cursor        # или: coop setup claude
+coop setup cursor        # или: claude, opencode, kimi, zcode, codex, gemini
 ```
 
 - **Cursor CLI:** один раз разрешите сервер: `cursor-agent mcp enable coop`
   (на Windows команда может называться `agent`). Затем `cursor-agent`.
 - **Cursor (редактор):** откройте папку, при запросе включите MCP-сервер `coop`.
 - **Claude Code:** `claude` в этой папке, при запуске разрешите сервер `coop`.
+- **OpenCode:** `opencode` в этой папке.
+- **Kimi Code** (`kimi`): при первом запуске отметьте папку как доверенную —
+  иначе Kimi не запустит MCP-сервер проекта.
+- **ZCode** (Z.ai): откройте папку; сервер `coop` берётся из `.agents/mcp.json`.
 
 Если агент уже был запущен — перезапустите его после `coop setup`.
+
+### Китайские модели (GLM, Kimi)
+
+coop всё равно, какая модель думает — важен агент. Два пути:
+
+1. **Родной агент:** Kimi Code → `coop setup kimi`; ZCode (Z.ai) →
+   `coop setup zcode`.
+2. **Модель внутри Claude Code или OpenCode** — так официально
+   рекомендуют и Z.ai, и Moonshot. Тогда `coop setup claude` (или
+   `opencode`), а модель настраивается в `~/.claude/settings.json`, блок `env`:
+   - **GLM (Z.ai):** `ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic`,
+     `ANTHROPIC_AUTH_TOKEN=<ключ>`, `API_TIMEOUT_MS=3000000`.
+     Подробнее: https://docs.z.ai/devpack/tool/claude
+   - **Kimi:** `ANTHROPIC_BASE_URL=https://api.kimi.ai/coding/`
+     (из Китая — `https://api.kimi.com/coding/`), `ANTHROPIC_API_KEY=<ключ>`,
+     модель — по вашему тарифу. Подробнее:
+     https://www.kimi.com/code/docs/en/third-party-tools/claude-code.html
+
+Особенно интересно, как китайские модели держат правила: проверка
+«подмены указаний» из сценария ниже — для них главная.
 
 ## 4. Команды в чате агента
 
@@ -111,7 +135,8 @@ coop setup cursor        # или: coop setup claude
 | `has not been approved` | `cursor-agent mcp enable coop` |
 | «no server is configured» | шаг 2: `coop login --server https://coop.foto38.ru` |
 | `coop: command not found` | новое окно терминала; на Windows — проверить PATH |
-| в меню нет команд `/coop-…` | перезапустить агента; ещё раз `coop setup cursor` |
+| в меню нет команд `/coop-…` | перезапустить агента; ещё раз `coop setup <агент>` |
+| агент отвечает по-английски | напишите ему «пиши по-русски» |
 | агент стоит и ждёт | напишите ему «продолжай» или `/coop-status` |
 | странные символы вместо иконок (старая консоль Windows) | Windows Terminal, или `$env:COOP_PLAIN=1` |
 
