@@ -280,6 +280,9 @@ func fail(w http.ResponseWriter, err error) {
 		writeJSON(w, status(ce.Code), api.ErrorResponse{Error: ce.Code, Message: ce.Msg})
 		return
 	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return // the client went away; nobody reads the answer
+	}
 	log.Printf("internal error: %v", err)
 	writeJSON(w, http.StatusInternalServerError, api.ErrorResponse{Error: "internal", Message: "internal error"})
 }

@@ -49,3 +49,14 @@ func TestFullRoomOnServer(t *testing.T) {
 
 	negotiate(t, tm, filepath.Join(dir, ".coop", "agreement-orders-export.md"))
 }
+
+// A wait that runs out of time must report "nothing new", not an error,
+// even when the deadline falls between the long-poll and the reload.
+func TestServerWaitTimeoutIsNotAnError(t *testing.T) {
+	hs, key := startServer(t)
+	tm := &term{t: t, dir: t.TempDir()}
+	tm.run(0, "open", "--topic", "t", "--server", hs.URL, "--key", key)
+	for _, d := range []string{"1ms", "50ms", "300ms", "1s"} {
+		mustContain(t, tm.run(0, "wait", "--agent", "--timeout", d), "no new messages")
+	}
+}

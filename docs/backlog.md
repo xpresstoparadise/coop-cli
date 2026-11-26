@@ -16,6 +16,10 @@ keys. Plain text stays for `--agent`, MCP, pipes, `NO_COLOR` and
 
 ## Found during testing
 
+- To decide: an agent may still post a `note` while the room is paused
+  (seen in testing: agent A posted one after side B's human raised a hand).
+  A human who raised a hand probably expects silence; consider refusing
+  agent notes during a pause.
 - (fixed in v0.2.0) `Slugify` dropped Cyrillic; it now transliterates.
 - (fixed in v0.2.0) the `unread_human_message` hint was lost.
 - (fixed in v0.2.0) `empty message` now says how to give the text.

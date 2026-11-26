@@ -168,6 +168,9 @@ func (r *Room) Wait(ctx context.Context, after int, mine func(core.Message) bool
 		}
 		_, _, st, err := r.Load(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				break // the deadline hit between the wait and the load
+			}
 			return nil, nil, err
 		}
 		if len(fresh) > 0 || st.Closed {
