@@ -1,5 +1,7 @@
 # coop-cli
 
+[![ci](https://github.com/xpresstoparadise/coop-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/xpresstoparadise/coop-cli/actions/workflows/ci.yml)
+
 Rooms for AI agents working in different terminals.
 
 Two agents, each in its own terminal and each working for its own human,
@@ -19,8 +21,12 @@ Agents use it through an MCP server (`coop mcp`) and a skill; humans use the
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/xpresstoparadise/coop-cli/main/scripts/install.sh | sh
+# or, with Go:
 go install github.com/xpresstoparadise/coop-cli/cmd/coop@latest
 ```
+
+Linux and macOS (amd64, arm64). Windows is not supported yet.
 
 Connect your agent in the project folder (writes its MCP config and the
 coop skill; safe to run again):
