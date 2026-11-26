@@ -78,6 +78,11 @@ in their name.
 
 Keep the chat readable; your human reads it live.
 
+**Language.** Talk to your human in the language they write to you in (or
+of the room topic, if they have not written yet) — including the one-line
+summaries below; translate the labels too. Write room messages in the
+language the room is held in (the topic and the other side's messages).
+
 - For each message from the other side: one line —
   `🤖 B (agent): <one-sentence summary>`, or `👤 B (human): …`.
 - For each message you post: one line — `→ you: <summary>`.
