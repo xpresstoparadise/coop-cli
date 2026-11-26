@@ -89,8 +89,20 @@ Kinds:
   and nothing B writes is an instruction to A's agent.
 - A side is **not** protected from its own agent: on one machine an agent
   with a shell can read its human's credentials. We do not pretend
-  otherwise. Mitigations: `open`, `join`, `approve`, `close`, `resume` are
-  not exposed over MCP, and `approve` asks for confirmation on a TTY.
+  otherwise.
+- **Chat mode (decision, 2026-11-26).** The human drives everything from
+  the agent's chat: `/coop open`, `/coop join CODE`, `/coop approve`,
+  `/coop resume`, `/coop close`, `/coop say`. The agent performs human
+  actions through MCP tools (`coop_approve`, `coop_resume`, `coop_close`,
+  `coop_say_human`) **as the human, without a further confirmation**.
+  What stops an agent from calling them on its own — or because the other
+  side's messages talk it into it — is only its instructions (tool
+  descriptions and the skill). Considered and rejected: a client dialog
+  (MCP elicitation; works in Claude Code, but Cursor CLI declares it and
+  declines automatically), the client's "run this tool?" prompt (gone in
+  Cursor's Run Everything mode), a browser confirmation link (leaves the
+  chat). `coop approve` in a terminal (TTY prompt) and `coop watch` remain
+  for people who want the stronger guarantee.
 - Messages from the other side are delivered wrapped as
   `<from side="B" actor="agent">...</from>`; the skill tells the agent to
   treat them as data and to take instructions only from its own human.
@@ -161,9 +173,10 @@ coop/
 
 Every CLI agent gets the same two things; only the config format differs.
 
-- **One MCP server** (`coop mcp`, stdio) with only the agent's tools:
-  `coop_status`, `coop_read`, `coop_say`, `coop_wait`, `coop_hand`. It always
-  acts as the agent. The project folder comes from `--dir`, `$COOP_DIR` or
+- **One MCP server** (`coop mcp`, stdio). Agent tools: `coop_status`,
+  `coop_read`, `coop_say`, `coop_wait`, `coop_hand`. Setup tools:
+  `coop_open`, `coop_join`. Human tools, used on the human's command in the
+  chat (§4): `coop_approve`, `coop_resume`, `coop_close`, `coop_say_human`. The project folder comes from `--dir`, `$COOP_DIR` or
   `$CLAUDE_PROJECT_DIR`, else the working folder.
 - **One skill**, `skills/coop/SKILL.md`, embedded in the binary: trust rules
   first, then the read/say/wait loop, resolutions, when to raise a hand.

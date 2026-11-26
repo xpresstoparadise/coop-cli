@@ -107,15 +107,23 @@ func openOnServer(ctx context.Context, env *Env, root, server, key, slug string,
 	}
 	if o.on {
 		o.println(o.u.OK(fmt.Sprintf("opened %s on %s as side %s", o.u.Bold(room.Topic), o.u.Dim(server), o.u.Side(id.Side))))
-		o.println(o.u.Invitation(resp.Code, resp.Invitation))
+		code := resp.Code
+		if code == "" { // an older server: only the link
+			code = resp.Invitation
+		}
+		o.println(o.u.Invitation(code, resp.Invitation))
 		o.println(o.u.Hint("send it to the other side; then `coop watch` to follow the room"))
 		return nil
 	}
 	fmt.Fprintf(env.Stdout, "opened room %q on %s as side %s\n", room.Topic, server, id.Side)
-	fmt.Fprintf(env.Stdout, "invite code (single use, a secret): %s\n", resp.Code)
+	if resp.Code != "" {
+		fmt.Fprintf(env.Stdout, "invite code (single use, a secret): %s\n", resp.Code)
+	}
 	fmt.Fprintf(env.Stdout, "send this single-use invitation to the other side (it is a secret):\n\n  %s\n\n", resp.Invitation)
 	fmt.Fprintf(env.Stdout, "they run: coop join '%s'\n", resp.Invitation)
-	fmt.Fprintf(env.Stdout, "or, with the same server configured: coop join %s\n", resp.Code)
+	if resp.Code != "" {
+		fmt.Fprintf(env.Stdout, "or, with the same server configured: coop join %s\n", resp.Code)
+	}
 	return nil
 }
 
