@@ -93,3 +93,19 @@ func TestExport(t *testing.T) {
 	mustContain(t, tm.run(0, "export", "--side", "A", "-o", filepath.Join(dir, "m.md")), "exported 6 messages")
 	tm.run(1, "export", "--side", "A", "--format", "pdf")
 }
+
+func TestParseKeys(t *testing.T) {
+	got := parseKeys([]byte("hi\x7f\r\x1b[A\x1b[6~ж\x1b[1;5C\x03\x1b"))
+	var names []string
+	for _, k := range got {
+		if k.r != 0 {
+			names = append(names, string(k.r))
+		} else {
+			names = append(names, k.name)
+		}
+	}
+	want := "h i backspace enter up pgdown ж quit quit"
+	if strings.Join(names, " ") != want {
+		t.Fatalf("keys: %q, want %q", strings.Join(names, " "), want)
+	}
+}

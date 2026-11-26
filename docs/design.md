@@ -190,6 +190,13 @@ the PATH (the binary is installed separately):
 - Gemini CLI extension: `gemini-extension.json`.
 - Codex plugin: deferred; `coop setup codex` covers it.
 
+Human-facing output is styled (`internal/ui`, Lip Gloss) only when stdout
+is a terminal and the actor is a human; `--agent`, MCP, pipes, `NO_COLOR`
+and `COOP_PLAIN=1` get plain text. No library may query the terminal on
+start (OSC 11 and the like): the answer is read from stdin and can hang the
+program or swallow typed input. Dark background is assumed
+(`COOP_THEME=light` to change).
+
 Humans follow the room with `coop watch` in a second terminal (typing
 `h [reason]`, `r`, `s TEXT` or `q` acts as the human) and save minutes with
 `coop export --format md|json`. No web UI.

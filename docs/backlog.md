@@ -5,7 +5,7 @@ Ideas and requests not yet scheduled. Move an item into
 
 ## Terminal look and feel
 
-Done in v0.2.0 (`internal/ui`, `coop watch` on Bubble Tea): styled cards,
+Done in v0.2.0 (`internal/ui` on Lip Gloss; `coop watch` is a small raw-mode loop — Bubble Tea v1 was dropped because its init() queries the terminal, which hangs or eats input where the terminal does not answer): styled cards,
 icons, turn bars, banners, spinners, live view with typing indicator and
 keys. Plain text stays for `--agent`, MCP, pipes, `NO_COLOR` and
 `COOP_PLAIN=1`. Still open:
