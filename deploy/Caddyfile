@@ -1,8 +1,6 @@
+# Caddy has no upstream read timeout by default, so the 50 s long-poll
+# needs no extra settings. Replace the domain with yours.
 coop.example.org {
-	reverse_proxy 127.0.0.1:8470 {
-		# Long-poll requests are held up to 50 s.
-		transport http {
-			read_timeout 90s
-		}
-	}
+	encode gzip
+	reverse_proxy 127.0.0.1:8470
 }
