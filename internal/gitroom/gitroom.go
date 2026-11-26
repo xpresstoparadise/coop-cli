@@ -109,9 +109,11 @@ func Create(ctx context.Context, opt Options, room core.Room) (*Room, error) {
 	}
 	data, _ := json.MarshalIndent(room, "", "  ")
 	files := map[string][]byte{
-		r.roomFile():                          append(data, '\n'),
-		filepath.Join(r.Dir(), ".gitignore"):  []byte(".lock\n"),
-		filepath.Join(r.threadDir(), ".keep"): nil,
+		r.roomFile():                         append(data, '\n'),
+		filepath.Join(r.Dir(), ".gitignore"): []byte(".lock\n"),
+		// Keep LF everywhere, whatever core.autocrlf says on Windows.
+		filepath.Join(r.Dir(), ".gitattributes"): []byte("* text eol=lf\n"),
+		filepath.Join(r.threadDir(), ".keep"):    nil,
 	}
 	var paths []string
 	for p, b := range files {
@@ -282,7 +284,8 @@ func decode(name string, data []byte) (core.Message, error) {
 	}
 	seq, _ := strconv.Atoi(g[1])
 	m := core.Message{Seq: seq, Side: g[2], Actor: core.Actor(g[3]), Kind: core.Kind(g[4])}
-	text := string(data)
+	// git on Windows may check files out with CRLF line endings.
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
 	if !strings.HasPrefix(text, "---\n") {
 		return m, fmt.Errorf("%s: missing front matter", name)
 	}

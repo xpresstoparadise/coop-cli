@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,6 +59,16 @@ func TestEncodeDecode(t *testing.T) {
 	}
 	if got != m {
 		t.Fatalf("round trip:\n got %+v\nwant %+v", got, m)
+	}
+}
+
+func TestDecodeCRLF(t *testing.T) {
+	m := core.Message{Seq: 1, Side: "A", Actor: core.Agent, Kind: core.Propose, Body: "a\nb",
+		At: time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)}
+	crlf := strings.ReplaceAll(string(encode(m)), "\n", "\r\n")
+	got, err := decode(fileName(m), []byte(crlf))
+	if err != nil || got != m {
+		t.Fatalf("CRLF decode: %+v, %v", got, err)
 	}
 }
 
