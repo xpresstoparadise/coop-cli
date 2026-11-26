@@ -8,12 +8,15 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/xpresstoparadise/coop-cli/internal/server"
+	"github.com/xpresstoparadise/coop-cli/internal/userconf"
 )
 
 func dbFlag(fs *flag.FlagSet) *string {
@@ -129,5 +132,44 @@ func cmdPurge(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 	fmt.Fprintf(env.Stdout, "deleted %d rooms\n", n)
+	return nil
+}
+
+func cmdLogin(ctx context.Context, env *Env, args []string) error {
+	fs := flag.NewFlagSet("coop login", flag.ContinueOnError)
+	fs.SetOutput(env.Stderr)
+	srv := fs.String("server", "", "coop server URL, e.g. https://coop.example.org")
+	key := fs.String("key", "", "host key (lets you open rooms on that server)")
+	if err := parse(fs, args); err != nil {
+		return err
+	}
+	if *srv == "" {
+		return errors.New("login needs --server URL")
+	}
+	u, err := url.Parse(*srv)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return fmt.Errorf("--server must be an http(s) URL, got %q", *srv)
+	}
+	cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(cctx, "GET", strings.TrimRight(*srv, "/")+"/healthz", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("cannot reach %s: %v", *srv, err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("%s does not look like a coop server (healthz: %s)", *srv, resp.Status)
+	}
+	p, err := userconf.Save(userconf.Config{Server: strings.TrimRight(*srv, "/"), HostKey: *key})
+	if err != nil {
+		return err
+	}
+	o := newOut(env, "human")
+	what := "server"
+	if *key != "" {
+		what = "server and host key"
+	}
+	o.say(fmt.Sprintf("saved %s to %s", what, p), o.u.OK(fmt.Sprintf("saved %s to %s", what, o.u.Code(p))))
 	return nil
 }

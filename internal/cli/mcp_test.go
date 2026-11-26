@@ -24,8 +24,12 @@ func startMCP(t *testing.T, dir, side string) *mcpClient {
 	outR, outW := io.Pipe()
 	ctx, cancel := context.WithCancel(context.Background())
 	env := Env{Stdin: inR, Stdout: outW, Stderr: io.Discard, Dir: dir, IsTTY: func() bool { return false }}
+	args := []string{"mcp"}
+	if side != "" {
+		args = append(args, "--side", side)
+	}
 	go func() {
-		Run(ctx, env, []string{"mcp", "--side", side})
+		Run(ctx, env, args)
 		outW.Close()
 	}()
 	t.Cleanup(func() { inW.Close(); cancel() })
@@ -105,7 +109,7 @@ func TestMCP(t *testing.T) {
 
 	a.send("tools/list", nil)
 	list := string(a.recv().Result)
-	for _, name := range []string{"coop_status", "coop_read", "coop_say", "coop_wait", "coop_hand"} {
+	for _, name := range []string{"coop_open", "coop_join", "coop_status", "coop_read", "coop_say", "coop_wait", "coop_hand"} {
 		if !strings.Contains(list, `"`+name+`"`) {
 			t.Fatalf("tools/list misses %s", name)
 		}

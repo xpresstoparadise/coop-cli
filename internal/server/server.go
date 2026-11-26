@@ -113,6 +113,18 @@ func hash(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
+const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+// inviteCode is 10 Crockford base32 characters (50 bits), single use.
+func inviteCode() string {
+	b := random(10)
+	out := make([]byte, 10)
+	for i := range out {
+		out[i] = crockford[int(b[i])%32]
+	}
+	return string(out)
+}
+
 func roomID() string {
 	return strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(random(10)))
 }
@@ -329,6 +341,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /r/{id}", s.invitationPage)
 	mux.HandleFunc("POST /v1/rooms", s.create)
 	mux.HandleFunc("POST /v1/rooms/{id}/join", s.join)
+	mux.HandleFunc("POST /v1/join", s.join)
 	mux.HandleFunc("GET /v1/rooms/{id}", s.get)
 	mux.HandleFunc("POST /v1/rooms/{id}/messages", s.post)
 	mux.HandleFunc("GET /v1/rooms/{id}/wait", s.wait)
@@ -367,7 +380,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	room := core.NewRoom(req.Topic, req.TurnBudget)
-	id, code := roomID(), base64.RawURLEncoding.EncodeToString(random(16))
+	id, code := roomID(), inviteCode()
 	tx, err := s.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		fail(w, err)
@@ -391,10 +404,13 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, api.CreateResponse{
 		RoomID: id, Room: room, Credentials: creds,
-		Invitation: s.baseURL + "/r/" + id + "#" + code,
+		Invitation: s.baseURL + "/r/" + id + "#" + api.FormatCode(code),
+		Code:       api.FormatCode(code),
 	})
 }
 
+// join claims an invitation: with the room in the path (invitation link)
+// or by the code alone (POST /v1/join).
 func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req api.JoinRequest
@@ -402,18 +418,30 @@ func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	norm := api.NormalizeCode(req.Code)
+	// Codes of rooms opened before short codes were case-sensitive base64.
+	hashes := []any{hash(norm), hash(req.Code)}
 	tx, err := s.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`UPDATE rooms SET invite_hash=NULL, active_at=? WHERE id=? AND invite_hash=?`, ts(s.now()), id, hash(req.Code))
+	if id == "" && req.Code != "" {
+		err := tx.QueryRow(`SELECT id FROM rooms WHERE invite_hash IN (?,?)`, hashes...).Scan(&id)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			fail(w, err)
+			return
+		}
+	}
+	res, err := tx.Exec(`UPDATE rooms SET invite_hash=NULL, active_at=? WHERE id=? AND invite_hash IN (?,?)`,
+		append([]any{ts(s.now()), id}, hashes...)...)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 || req.Code == "" {
+		time.Sleep(500 * time.Millisecond) // slow down guessing
 		fail(w, errInvitation)
 		return
 	}

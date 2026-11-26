@@ -3,6 +3,7 @@
 //
 //	POST /v1/rooms                 host key   → CreateResponse
 //	POST /v1/rooms/{id}/join       invitation → JoinResponse
+//	POST /v1/join                  invite code → JoinResponse
 //	GET  /v1/rooms/{id}            token      → RoomResponse
 //	POST /v1/rooms/{id}/messages   token      → PostResponse
 //	GET  /v1/rooms/{id}/wait       token      → WaitResponse  (?after=N&timeout=50s)
@@ -11,7 +12,37 @@
 // message come from the token, never from the request body.
 package api
 
-import "github.com/xpresstoparadise/coop-cli/internal/core"
+import (
+	"strings"
+
+	"github.com/xpresstoparadise/coop-cli/internal/core"
+)
+
+// NormalizeCode canonicalises an invite code as people type it: case,
+// spaces and dashes do not matter, and O/I/L read as 0/1 (Crockford).
+func NormalizeCode(code string) string {
+	var b strings.Builder
+	for _, r := range strings.ToUpper(code) {
+		switch r {
+		case '-', ' ', '_', '\t':
+			continue
+		case 'O':
+			r = '0'
+		case 'I', 'L':
+			r = '1'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// FormatCode groups a normalised code for display: K3M2X-7XQPA.
+func FormatCode(code string) string {
+	if len(code) == 10 {
+		return code[:5] + "-" + code[5:]
+	}
+	return code
+}
 
 // Token prefixes.
 const (
@@ -41,6 +72,7 @@ type CreateResponse struct {
 	Room        core.Room   `json:"room"`
 	Credentials Credentials `json:"credentials"`
 	Invitation  string      `json:"invitation"` // <base>/r/<id>#<code>
+	Code        string      `json:"code"`       // the same secret, short: K3M2X-7XQPA
 }
 
 type JoinRequest struct {

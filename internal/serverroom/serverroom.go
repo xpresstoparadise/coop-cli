@@ -101,6 +101,29 @@ func Join(ctx context.Context, invitation string) (server string, resp *api.Join
 	return server, &out, nil
 }
 
+// JoinCode claims a short invite code on server.
+func JoinCode(ctx context.Context, server, code string) (*api.JoinResponse, error) {
+	var out api.JoinResponse
+	if err := do(ctx, "POST", strings.TrimRight(server, "/")+"/v1/join", "", api.JoinRequest{Code: code}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// LooksLikeCode reports whether s could be a short invite code.
+func LooksLikeCode(s string) bool {
+	n := api.NormalizeCode(s)
+	if len(n) != 10 {
+		return false
+	}
+	for _, r := range n {
+		if !strings.ContainsRune("0123456789ABCDEFGHJKMNPQRSTVWXYZ", r) {
+			return false
+		}
+	}
+	return true
+}
+
 // Room is a room on a server, seen through one token.
 type Room struct {
 	Server, ID, Token string

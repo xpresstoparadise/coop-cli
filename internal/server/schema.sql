@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS rooms (
   closed_at   TEXT
 );
 
+CREATE INDEX IF NOT EXISTS rooms_invite ON rooms(invite_hash);
+
 CREATE TABLE IF NOT EXISTS tokens (
   hash    TEXT PRIMARY KEY,
   room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,

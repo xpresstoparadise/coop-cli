@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/xpresstoparadise/coop-cli/internal/api"
 	"github.com/xpresstoparadise/coop-cli/internal/core"
 	"github.com/xpresstoparadise/coop-cli/internal/gitroom"
 	"github.com/xpresstoparadise/coop-cli/internal/local"
 	"github.com/xpresstoparadise/coop-cli/internal/serverroom"
+	"github.com/xpresstoparadise/coop-cli/internal/userconf"
 )
 
 // backend is where a room lives. Both backends apply the core rules: the
@@ -105,17 +107,44 @@ func openOnServer(ctx context.Context, env *Env, root, server, key, slug string,
 	}
 	if o.on {
 		o.println(o.u.OK(fmt.Sprintf("opened %s on %s as side %s", o.u.Bold(room.Topic), o.u.Dim(server), o.u.Side(id.Side))))
-		o.println(o.u.Invitation(resp.Invitation))
+		o.println(o.u.Invitation(resp.Code, resp.Invitation))
 		o.println(o.u.Hint("send it to the other side; then `coop watch` to follow the room"))
 		return nil
 	}
 	fmt.Fprintf(env.Stdout, "opened room %q on %s as side %s\n", room.Topic, server, id.Side)
+	fmt.Fprintf(env.Stdout, "invite code (single use, a secret): %s\n", resp.Code)
 	fmt.Fprintf(env.Stdout, "send this single-use invitation to the other side (it is a secret):\n\n  %s\n\n", resp.Invitation)
 	fmt.Fprintf(env.Stdout, "they run: coop join '%s'\n", resp.Invitation)
+	fmt.Fprintf(env.Stdout, "or, with the same server configured: coop join %s\n", resp.Code)
 	return nil
 }
 
+func joinByCode(ctx context.Context, env *Env, root, server, code string) error {
+	if server == "" {
+		conf, err := userconf.Load()
+		if err != nil {
+			return err
+		}
+		server = conf.Server
+	}
+	if server == "" {
+		return errors.New("which server is this code for? run `coop login --server URL` once, or pass --server")
+	}
+	server = strings.TrimRight(server, "/")
+	return claimOnServer(ctx, env, root, func() (string, *api.JoinResponse, error) {
+		resp, err := serverroom.JoinCode(ctx, server, code)
+		return server, resp, err
+	})
+}
+
 func joinOnServer(ctx context.Context, env *Env, root, invitation string) error {
+	return claimOnServer(ctx, env, root, func() (string, *api.JoinResponse, error) {
+		return serverroom.Join(ctx, invitation)
+	})
+}
+
+// claimOnServer spends an invitation with claim and saves side B here.
+func claimOnServer(ctx context.Context, env *Env, root string, claim func() (string, *api.JoinResponse, error)) error {
 	// The server always gives the invited side B. Check before the
 	// single-use invitation is spent.
 	if id, err := local.Load(root, "B"); err == nil {
@@ -126,7 +155,7 @@ func joinOnServer(ctx context.Context, env *Env, root, invitation string) error 
 	var resp *api.JoinResponse
 	err := o.spin("joining…", func() error {
 		var err error
-		server, resp, err = serverroom.Join(ctx, invitation)
+		server, resp, err = claim()
 		return err
 	})
 	if err != nil {

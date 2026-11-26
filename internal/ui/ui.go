@@ -260,11 +260,15 @@ func (u *UI) Resolution(st *core.State, width int) string {
 	return box.Render(head + "\n\n" + st.ResolutionBody())
 }
 
-// Invitation renders an invitation to pass on.
-func (u *UI) Invitation(inv string) string {
+// Invitation renders an invitation to pass on: the short code and the link.
+func (u *UI) Invitation(code, link string) string {
 	box := u.s().Border(lipgloss.RoundedBorder()).BorderForeground(colAccent).Padding(0, 1)
-	return box.Render("📨 " + u.Bold("invitation") + u.Dim(" · single use · keep it secret") + "\n\n" +
-		u.Code("coop join '"+inv+"'"))
+	big := u.s().Foreground(colAccent).Bold(true).Render(code)
+	return box.Render("📨 " + u.Bold("invite code") + u.Dim(" · single use · keep it secret") + "\n\n" +
+		"   " + big + "\n\n" +
+		u.Dim("in a chat: ") + u.Code("/coop join "+code) + "\n" +
+		u.Dim("terminal:  ") + u.Code("coop join "+code) + "\n" +
+		u.Dim("link:      ") + u.Dim(link))
 }
 
 // ---- spinner

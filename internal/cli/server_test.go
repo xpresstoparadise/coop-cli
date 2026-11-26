@@ -60,3 +60,53 @@ func TestServerWaitTimeoutIsNotAnError(t *testing.T) {
 		mustContain(t, tm.run(0, "wait", "--agent", "--timeout", d), "no new messages")
 	}
 }
+
+func TestLoginAndJoinByCode(t *testing.T) {
+	t.Setenv("COOP_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	hs, key := startServer(t)
+	a := &term{t: t, dir: t.TempDir()}
+	a.run(1, "login", "--server", "http://127.0.0.1:1") // unreachable
+	a.run(0, "login", "--server", hs.URL, "--key", key) // saved for this test process
+	out := a.run(0, "open", "--topic", "Коды")          // server from login
+	m := regexp.MustCompile(`invite code \(single use, a secret\): (\S+)`).FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("no code in:\n%s", out)
+	}
+	code := m[1]
+	if !regexp.MustCompile(`^[0-9A-Z]{5}-[0-9A-Z]{5}$`).MatchString(code) {
+		t.Fatalf("code %q", code)
+	}
+	b := &term{t: t, dir: t.TempDir()}
+	// Typed carelessly: lower case, no dash. Still works, once.
+	mustContain(t, b.run(0, "join", strings.ToLower(strings.ReplaceAll(code, "-", ""))), "joined room \"Коды\"")
+	c := &term{t: t, dir: t.TempDir()}
+	mustContain(t, c.run(1, "join", code), "invalid_invitation")
+	// --git still opens a git room although a server is configured.
+	mustContain(t, (&term{t: t, dir: t.TempDir()}).run(0, "open", "--git", "--topic", "local"), "coop/local")
+}
+
+func TestMCPOpenAndJoin(t *testing.T) {
+	t.Setenv("COOP_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	hs, key := startServer(t)
+	(&term{t: t, dir: t.TempDir()}).run(0, "login", "--server", hs.URL, "--key", key)
+
+	a := startMCP(t, t.TempDir(), "")
+	a.send("initialize", map[string]any{"protocolVersion": "2025-11-25"})
+	a.recv()
+	r := a.call("coop_open", map[string]any{"topic": "Из чата", "turns": 5})
+	m := regexp.MustCompile(`invite code \(single use, a secret\): (\S+)`).FindStringSubmatch(r.Content[0].Text)
+	if r.IsError || m == nil {
+		t.Fatalf("coop_open: %+v", r)
+	}
+	b := startMCP(t, t.TempDir(), "")
+	b.send("initialize", map[string]any{"protocolVersion": "2025-11-25"})
+	b.recv()
+	r = b.call("coop_join", map[string]any{"invite": m[1]})
+	if r.IsError || !strings.Contains(r.Content[0].Text, `joined room "Из чата"`) {
+		t.Fatalf("coop_join: %+v", r)
+	}
+	r = b.call("coop_status", nil)
+	if !strings.Contains(r.Content[0].Text, "you: side B, agent") {
+		t.Fatalf("status after join: %+v", r)
+	}
+}

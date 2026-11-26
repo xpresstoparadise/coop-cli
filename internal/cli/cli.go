@@ -20,6 +20,7 @@ import (
 	"github.com/xpresstoparadise/coop-cli/internal/gitroom"
 	"github.com/xpresstoparadise/coop-cli/internal/local"
 	"github.com/xpresstoparadise/coop-cli/internal/serverroom"
+	"github.com/xpresstoparadise/coop-cli/internal/userconf"
 )
 
 const usage = `coop — rooms for AI agents working in different terminals
@@ -27,8 +28,13 @@ const usage = `coop — rooms for AI agents working in different terminals
 Usage:
   coop open --topic TEXT [--slug NAME] [--turns N] [--remote]
                               open a room in coop/<slug>/ as side A
-  coop open --topic TEXT --server URL [--key KEY]
-                              open a room on a coop server; prints an invitation
+  coop login --server URL [--key KEY]
+                              remember your coop server (and host key)
+  coop open --topic TEXT [--server URL] [--key KEY] [--git]
+                              open a room on your server (or, with --git or
+                              no server configured, in coop/ of this repo);
+                              prints an invite code
+  coop join CODE              join a server room by its invite code
   coop join [SLUG] [--side B] [--remote]
                               join a room of this repository
   coop join INVITATION        join a server room with the invitation link
@@ -142,7 +148,7 @@ func init() {
 	commands = map[string]func(context.Context, *Env, []string) error{
 		"open": cmdOpen, "join": cmdJoin, "status": cmdStatus, "read": cmdRead,
 		"wait": cmdWait, "say": cmdSay, "hand": cmdHand, "resume": cmdResume,
-		"approve": cmdApprove, "close": cmdClose, "mcp": cmdMCP, "setup": cmdSetup,
+		"approve": cmdApprove, "close": cmdClose, "mcp": cmdMCP, "setup": cmdSetup, "login": cmdLogin,
 		"watch": cmdWatch, "export": cmdExport,
 		"serve": cmdServe, "key": cmdKey, "purge": cmdPurge,
 	}
@@ -286,10 +292,21 @@ func cmdOpen(ctx context.Context, env *Env, args []string) error {
 	slug := fs.String("slug", "", "folder name under coop/ (default: from the topic)")
 	turns := fs.Int("turns", core.DefaultTurnBudget, "agent turns per side before the room pauses")
 	remote := fs.Bool("remote", false, "commit, push and pull every message through git")
-	server := fs.String("server", os.Getenv("COOP_SERVER"), "open the room on this coop server instead of in git ($COOP_SERVER)")
-	hostKey := fs.String("key", "", "host key for the server (default: $COOP_HOST_KEY)")
+	server := fs.String("server", "", "open the room on this coop server (default: from `coop login` or $COOP_SERVER)")
+	hostKey := fs.String("key", "", "host key for the server (default: from `coop login` or $COOP_HOST_KEY)")
+	gitMode := fs.Bool("git", false, "open the room in this repository's coop/ folder even if a server is configured")
 	if err := parse(fs, args); err != nil {
 		return err
+	}
+	conf, err := userconf.Load()
+	if err != nil {
+		return err
+	}
+	if *server == "" && !*gitMode && !*remote && *slug == "" {
+		*server = conf.Server
+	}
+	if *hostKey == "" {
+		*hostKey = conf.HostKey
 	}
 	if *topic == "" {
 		*topic = strings.Join(fs.Args(), " ")
@@ -336,6 +353,7 @@ func cmdJoin(ctx context.Context, env *Env, args []string) error {
 	fs.SetOutput(env.Stderr)
 	side := fs.String("side", "", "side to join as (default: $COOP_SIDE or B)")
 	remote := fs.Bool("remote", false, "commit, push and pull every message through git")
+	serverFlag := fs.String("server", "", "server for an invite code (default: from `coop login` or $COOP_SERVER)")
 	if err := parse(fs, args); err != nil {
 		return err
 	}
@@ -349,6 +367,11 @@ func cmdJoin(ctx context.Context, env *Env, args []string) error {
 	slug := fs.Arg(0)
 	if serverroom.IsInvitation(slug) {
 		return joinOnServer(ctx, env, root, slug)
+	}
+	if serverroom.LooksLikeCode(slug) {
+		if _, err := os.Stat(filepath.Join(root, "coop", slug)); err != nil { // not a git room of that name
+			return joinByCode(ctx, env, root, *serverFlag, slug)
+		}
 	}
 	if slug == "" {
 		entries, _ := os.ReadDir(filepath.Join(root, "coop"))
