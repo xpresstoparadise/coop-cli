@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "coop": {
+      "command": "coop",
+      "args": ["mcp"],
+      "env": { "COOP_DIR": "${CLAUDE_PROJECT_DIR}" },
+      "timeout": 660000
+    }
+  }
+}

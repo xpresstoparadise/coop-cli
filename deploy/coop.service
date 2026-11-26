@@ -1,0 +1,27 @@
+[Unit]
+Description=coop room server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=coop
+Group=coop
+EnvironmentFile=/etc/coop/coop.env
+ExecStart=/usr/local/bin/coop serve --addr 127.0.0.1:8470
+StateDirectory=coop
+WorkingDirectory=/var/lib/coop
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/coop
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

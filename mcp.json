@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "coop": {
+      "type": "stdio",
+      "command": "coop",
+      "args": ["mcp", "--dir", "${workspaceFolder}", "--max-wait", "55s"]
+    }
+  }
+}

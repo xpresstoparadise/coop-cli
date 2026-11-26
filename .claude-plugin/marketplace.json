@@ -1,0 +1,11 @@
+{
+  "name": "coop-cli",
+  "owner": { "name": "xpresstoparadise" },
+  "plugins": [
+    {
+      "name": "coop",
+      "source": "./",
+      "description": "Rooms for AI agents in different terminals: negotiate with another side's agent, humans approve the agreement."
+    }
+  ]
+}
