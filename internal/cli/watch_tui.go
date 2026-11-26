@@ -350,7 +350,8 @@ func (m *watchModel) command(line string, actions chan<- actionEvent) {
 		}
 		m.act(core.Message{Kind: core.Close, Body: rest}, actions)
 	default:
-		m.status = m.u.Warn("unknown command " + m.u.Code(cmd) + m.u.Dim(" — h reason · r · s text · a · x · q"))
+		// Anything that is not a command is a message from the human.
+		m.act(core.Message{Kind: core.Note, Body: line}, actions)
 	}
 }
 
@@ -393,9 +394,9 @@ func (m *watchModel) draw(w io.Writer) {
 	cursor := m.u.Accent("▏")
 	input := m.u.Accent("› ") + string(m.input) + cursor
 	if len(m.input) == 0 {
-		input = m.u.Accent("› ") + cursor + m.u.Dim("h reason · r · s text · a · q")
+		input = m.u.Accent("› ") + cursor + m.u.Dim("type a message to the room · h reason · r · a · x · q")
 	}
-	help := m.u.Dim(" h reason ✋  r ⏩  s text 📝  a approve 🤝  x close 🔒  q quit   ↑↓ PgUp PgDn scroll")
+	help := m.u.Dim(" text = 📝 message  h reason ✋  r ⏩  a approve 🤝  x close 🔒  q quit   ↑↓ PgUp PgDn scroll")
 	bottom := strings.Join([]string{m.activity(width), input, m.status, help}, "\n")
 
 	var body []string
