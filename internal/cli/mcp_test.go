@@ -161,3 +161,85 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("status: %+v", r)
 	}
 }
+
+func (c *mcpClient) recvRaw() map[string]any {
+	c.t.Helper()
+	done := make(chan map[string]any, 1)
+	go func() {
+		var m map[string]any
+		if c.out.Scan() {
+			json.Unmarshal(c.out.Bytes(), &m)
+		}
+		done <- m
+	}()
+	select {
+	case m := <-done:
+		return m
+	case <-time.After(5 * time.Second):
+		c.t.Fatal("no message from mcp server")
+	}
+	return nil
+}
+
+func (c *mcpClient) answer(id any, result any) {
+	data, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
+	fmt.Fprintf(c.in, "%s\n", data)
+}
+
+// callAnswering calls a human tool and answers its elicitation with yes/no.
+func (c *mcpClient) callAnswering(name string, yes bool) (string, string) {
+	c.t.Helper()
+	c.send("tools/call", map[string]any{"name": name, "arguments": map[string]any{}})
+	ask := c.recvRaw()
+	if ask["method"] != "elicitation/create" {
+		c.t.Fatalf("expected an elicitation, got %v", ask)
+	}
+	question := ask["params"].(map[string]any)["message"].(string)
+	if yes {
+		c.answer(ask["id"], map[string]any{"action": "accept", "content": map[string]any{"confirm": true}})
+	} else {
+		c.answer(ask["id"], map[string]any{"action": "decline"})
+	}
+	res := c.recvRaw()
+	b, _ := json.Marshal(res["result"])
+	return question, string(b)
+}
+
+func TestMCPHumanToolsNeedElicitation(t *testing.T) {
+	dir := t.TempDir()
+	tm := &term{t: t, dir: dir}
+	tm.run(0, "open", "--topic", "Orders")
+	tm.run(0, "join")
+	tm.run(0, "say", "--agent", "--side", "A", "--kind", "propose", "--resolution", "REST, 100 per page")
+	tm.run(0, "say", "--agent", "--side", "B", "--kind", "accept", "--re", "1", "ok")
+
+	// A client without elicitation gets no human tools.
+	plain := startMCP(t, dir, "B")
+	plain.send("initialize", map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{}})
+	plain.recv()
+	plain.send("tools/list", nil)
+	if strings.Contains(string(plain.recv().Result), "coop_approve") {
+		t.Fatal("human tools offered to a client that cannot ask its human")
+	}
+
+	b := startMCP(t, dir, "B")
+	b.send("initialize", map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{"elicitation": map[string]any{"form": map[string]any{}}}})
+	b.recv()
+	b.send("tools/list", nil)
+	list := string(b.recv().Result)
+	for _, n := range []string{"coop_approve", "coop_resume", "coop_close", "coop_say_human"} {
+		if !strings.Contains(list, `"`+n+`"`) {
+			t.Fatalf("missing %s", n)
+		}
+	}
+
+	q, res := b.callAnswering("coop_approve", false)
+	mustContain(t, q, "REST, 100 per page")
+	mustContain(t, res, "declined")
+	mustContain(t, tm.run(0, "status", "--side", "B"), "approved by 0 of 2")
+
+	_, res = b.callAnswering("coop_approve", true)
+	mustContain(t, res, "confirmed")
+	mustContain(t, tm.run(0, "status", "--side", "B"), "approved by 1 of 2")
+	mustContain(t, tm.run(0, "read", "--side", "A", "--all"), `actor="human" seq="3" kind="approve"`)
+}
