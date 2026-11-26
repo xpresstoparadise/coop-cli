@@ -56,6 +56,10 @@ func TestSetupAll(t *testing.T) {
 	mustContain(t, read(".gemini/settings.json"), `"timeout": 660000`)
 	mustContain(t, read("opencode.json"), `"$schema"`)
 	mustContain(t, read(".claude/skills/coop/SKILL.md"), "name: coop")
+	for _, cmd := range []string{"coop-open", "coop-join", "coop-status", "coop-approve", "coop-resume", "coop-say", "coop-close", "coop-stop"} {
+		mustContain(t, read(".agents/skills/"+cmd+"/SKILL.md"), "name: "+cmd)
+		mustContain(t, read(".claude/skills/"+cmd+"/SKILL.md"), "disable-model-invocation: true")
+	}
 
 	// Running again changes nothing.
 	again := tm.run(0, "setup", "all")

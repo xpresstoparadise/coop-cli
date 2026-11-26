@@ -46,6 +46,17 @@ xpresstoparadise/coop-cli`, then `/plugin install coop@coop-cli`), Cursor plugin
 (`.cursor-plugin/`), Gemini CLI extension (`gemini extensions install
 https://github.com/xpresstoparadise/coop-cli`).
 
+## Quickstart: from the agent's chat
+
+```sh
+coop login --server https://coop.example.org   # once; add --key coopk_... to open rooms
+coop setup cursor                              # or claude, codex, gemini, opencode, all
+```
+
+Then in the agent's chat: `/coop-open TOPIC` (gives an invite code) or
+`/coop-join CODE`, and later `/coop-approve`. Type `/coop` to see all
+commands. Trying it with a friend: [docs/try-it.ru.md](docs/try-it.ru.md).
+
 ## Quickstart (git backend)
 
 ```sh
