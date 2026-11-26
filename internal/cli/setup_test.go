@@ -81,3 +81,10 @@ func TestSetupAll(t *testing.T) {
 	write(".gemini/settings.json", "{ // comment\n}")
 	mustContain(t, tm.run(1, "setup", "gemini"), `"mcpServers"`)
 }
+
+func TestSplitFrontMatterCRLF(t *testing.T) {
+	fm, body := splitFrontMatter("---\r\nname: coop-join\r\ndescription: Join.\r\ndisable-model-invocation: true\r\n---\r\n\r\nBody $ARGUMENTS\r\n")
+	if fm["description"] != "Join." || strings.Contains(body, "disable-model-invocation") || !strings.Contains(body, "Body $ARGUMENTS") {
+		t.Fatalf("fm=%v body=%q", fm, body)
+	}
+}

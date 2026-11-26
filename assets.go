@@ -6,12 +6,14 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"strings"
 )
 
-// Skill is the main agent skill (skills/coop/SKILL.md).
-//
 //go:embed skills/coop/SKILL.md
-var Skill string
+var skill string
+
+// Skill is the main agent skill, with LF line endings.
+var Skill = strings.ReplaceAll(skill, "\r\n", "\n")
 
 //go:embed skills
 var skills embed.FS
@@ -28,7 +30,8 @@ func Skills() map[string]string {
 		}
 		data, err := skills.ReadFile(path.Join("skills", e.Name(), "SKILL.md"))
 		if err == nil {
-			out[e.Name()] = string(data)
+			// A Windows checkout may turn the files into CRLF.
+			out[e.Name()] = strings.ReplaceAll(string(data), "\r\n", "\n")
 		}
 	}
 	return out

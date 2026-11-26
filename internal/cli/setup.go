@@ -161,6 +161,7 @@ func commandsIn(dir string, hint bool) []setupFile {
 
 // splitFrontMatter parses a simple "key: value" YAML front matter.
 func splitFrontMatter(doc string) (map[string]string, string) {
+	doc = strings.ReplaceAll(doc, "\r\n", "\n")
 	fm := map[string]string{}
 	rest, ok := strings.CutPrefix(doc, "---\n")
 	if !ok {

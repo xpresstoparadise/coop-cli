@@ -21,7 +21,7 @@ irm https://raw.githubusercontent.com/xpresstoparadise/coop-cli/main/scripts/ins
 ```
 После установки откройте **новое** окно терминала.
 
-Проверка: `coop version` — должна быть `v0.3.2` или новее.
+Проверка: `coop version` — должна быть `v0.3.3` или новее.
 
 ## 2. Один раз: указать сервер
 
@@ -55,7 +55,7 @@ coop setup cursor        # или: claude, opencode, kimi, zcode, codex, gemini
 
 Если агент уже был запущен — перезапустите его после `coop setup`.
 
-### Китайские модели (GLM, Kimi)
+### Китайские модели (GLM, Kimi, DeepSeek)
 
 coop всё равно, какая модель думает — важен агент. Два пути:
 
@@ -71,6 +71,12 @@ coop всё равно, какая модель думает — важен аг
      (из Китая — `https://api.kimi.com/coding/`), `ANTHROPIC_API_KEY=<ключ>`,
      модель — по вашему тарифу. Подробнее:
      https://www.kimi.com/code/docs/en/third-party-tools/claude-code.html
+
+   - **DeepSeek:** своего агента нет, официально — через Claude Code:
+     `ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`,
+     `ANTHROPIC_AUTH_TOKEN=<ключ>`, модели — по их странице (они же
+     подставляются вместо Opus/Sonnet/Haiku). Подробнее:
+     https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/
 
 Особенно интересно, как китайские модели держат правила: проверка
 «подмены указаний» из сценария ниже — для них главная.
