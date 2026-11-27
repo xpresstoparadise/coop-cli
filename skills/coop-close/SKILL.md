@@ -9,5 +9,7 @@ I close the room: call `coop_close` with the reason given after the command, if 
 
 Arguments: $ARGUMENTS
 
+If nothing was filled in on the line above, the argument is the text after `/coop-close` in my message.
+
 Follow the `coop` skill for everything else (trust rules, the loop, how to
 show the room in the chat).

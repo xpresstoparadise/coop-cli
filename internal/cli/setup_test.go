@@ -71,6 +71,14 @@ func TestSetupAll(t *testing.T) {
 		t.Fatal("command files must not carry skill-only fields")
 	}
 
+	patch := read(".coop/dsh-plugin/cordis.patch.yml")
+	mustContain(t, patch, "@deepseek-ai/dsh-mcp-client")
+	mustContain(t, patch, "toolCallTimeoutMs: 180000")
+	mustContain(t, patch, `'--max-wait', '120s'`)
+	mustContain(t, patch, filepath.ToSlash(dir))
+	mustContain(t, read(".coop/dsh-plugin/package.json"), `"patch": "./cordis.patch.yml"`)
+	mustContain(t, read(".gitignore"), ".coop/")
+
 	// Running again changes nothing.
 	again := tm.run(0, "setup", "all")
 	if strings.Contains(again, "created") || strings.Contains(again, "updated") {

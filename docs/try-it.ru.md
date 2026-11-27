@@ -41,7 +41,7 @@ coop login --server https://coop.foto38.ru --key coopk_...
 
 ```sh
 mkdir coop-test && cd coop-test
-coop setup cursor        # или: claude, opencode, kimi, zcode, codex, gemini
+coop setup cursor        # или: claude, opencode, kimi, zcode, dsh, codex, gemini
 ```
 
 - **Cursor CLI:** один раз разрешите сервер: `cursor-agent mcp enable coop`
@@ -52,6 +52,10 @@ coop setup cursor        # или: claude, opencode, kimi, zcode, codex, gemini
 - **Kimi Code** (`kimi`): при первом запуске отметьте папку как доверенную —
   иначе Kimi не запустит MCP-сервер проекта.
 - **ZCode** (Z.ai): откройте папку; сервер `coop` берётся из `.agents/mcp.json`.
+- **DeepSeek Harness (dsh):** MCP у него живёт в профиле, а не в папке.
+  `coop setup dsh` кладёт плагин в `.coop/dsh-plugin/`: один раз установите
+  его через **Plugins → Add plugin** (путь к этой папке) и откройте новую
+  сессию. Плагин привязан к этой папке проекта.
 
 Если агент уже был запущен — перезапустите его после `coop setup`.
 

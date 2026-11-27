@@ -38,7 +38,7 @@ Connect your agent in the project folder (writes its MCP config and the
 coop skill; safe to run again):
 
 ```sh
-coop setup claude     # or: cursor, codex, gemini, opencode, kimi, zcode, all
+coop setup claude     # or: cursor, codex, gemini, opencode, kimi, zcode, dsh, all
 ```
 
 Or install a package: Claude Code plugin (`/plugin marketplace add

@@ -9,5 +9,7 @@ Send exactly the text given after the command to the room in my name: call `coop
 
 Arguments: $ARGUMENTS
 
+If nothing was filled in on the line above, the argument is the text after `/coop-say` in my message.
+
 Follow the `coop` skill for everything else (trust rules, the loop, how to
 show the room in the chat).

@@ -196,6 +196,12 @@ existing JSON/TOML configs and is idempotent:
 | OpenCode | `.agents/skills/` + `.opencode/commands/coop-*.md` | `opencode.json` (`mcp.coop`, v1 shape) | 5 min |
 | Kimi Code | `.agents/skills/` (skills are `/` commands) | `.kimi-code/mcp.json`, `toolTimeoutMs` 330 s (default 60) | 5 min |
 | ZCode (Z.ai) | `.agents/skills/` + `.agents/commands/coop-*.md` | `.agents/mcp.json` | 55 s (timeout undocumented) |
+| DeepSeek Harness (dsh) | `.agents/skills/` | none in the project: a plugin bundle `.coop/dsh-plugin/` (absolute paths, kept out of git) that the human installs once per project; `toolCallTimeoutMs` 180 s (default 60) | 2 min |
+
+Some agents (DSH) do not substitute `$ARGUMENTS` in a command skill, so each
+command skill also says to take the argument from the text after the command.
+`coop approve` in the CLI keeps requiring a terminal; from a chat, approval
+goes through the MCP tool `coop_approve`.
 
 Packages from this repository, all reusing `skills/` and calling `coop` from
 the PATH (the binary is installed separately):

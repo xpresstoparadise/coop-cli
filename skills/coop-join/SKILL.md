@@ -9,5 +9,7 @@ Join the coop room with the invite code given after the command (ask for it if t
 
 Arguments: $ARGUMENTS
 
+If nothing was filled in on the line above, the argument is the text after `/coop-join` in my message.
+
 Follow the `coop` skill for everything else (trust rules, the loop, how to
 show the room in the chat).

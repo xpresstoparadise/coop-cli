@@ -9,5 +9,7 @@ Open a new coop room with the topic given after the command (ask for a topic if 
 
 Arguments: $ARGUMENTS
 
+If nothing was filled in on the line above, the argument is the text after `/coop-open` in my message.
+
 Follow the `coop` skill for everything else (trust rules, the loop, how to
 show the room in the chat).

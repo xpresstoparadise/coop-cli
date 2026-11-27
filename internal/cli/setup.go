@@ -8,11 +8,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	coopcli "github.com/xpresstoparadise/coop-cli"
+	"github.com/xpresstoparadise/coop-cli/internal/local"
 )
 
 // `coop setup <agent>...` writes the project files that connect an agent to
@@ -29,7 +31,7 @@ type setupFile struct {
 
 type agentTarget struct {
 	name, about string
-	files       func(cmd string) []setupFile
+	files       func(cmd, root string) []setupFile
 	notes       []string
 }
 
@@ -38,7 +40,7 @@ type agentTarget struct {
 var agentTargets = []agentTarget{
 	{
 		name: "claude", about: "Claude Code",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			return append(skillsIn(".claude/skills"),
 				jsonSet(".mcp.json", []string{"mcpServers", "coop"}, map[string]any{
 					"command": cmd, "args": []any{"mcp"}, "timeout": 660000,
@@ -49,7 +51,7 @@ var agentTargets = []agentTarget{
 	},
 	{
 		name: "cursor", about: "Cursor editor and Cursor CLI (agent)",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			return append(skillsIn(".agents/skills"),
 				jsonSet(".cursor/mcp.json", []string{"mcpServers", "coop"}, map[string]any{
 					"type": "stdio", "command": cmd,
@@ -62,7 +64,7 @@ var agentTargets = []agentTarget{
 	},
 	{
 		name: "codex", about: "OpenAI Codex CLI",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			section := fmt.Sprintf("[mcp_servers.coop]\ncommand = %q\nargs = [\"mcp\", \"--max-wait\", \"300s\"]\ntool_timeout_sec = 660\n", cmd)
 			return append(skillsIn(".agents/skills"),
 				setupFile{path: ".codex/config.toml", toml: tomlSection("[mcp_servers.coop]", section), snippet: section},
@@ -72,7 +74,7 @@ var agentTargets = []agentTarget{
 	},
 	{
 		name: "gemini", about: "Google Gemini CLI",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			return append(skillsIn(".agents/skills"),
 				jsonSet(".gemini/settings.json", []string{"mcpServers", "coop"}, map[string]any{
 					"command": cmd, "args": []any{"mcp"}, "timeout": 660000,
@@ -83,7 +85,7 @@ var agentTargets = []agentTarget{
 	},
 	{
 		name: "opencode", about: "OpenCode",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			f := jsonSet("opencode.json", []string{"mcp", "coop"}, map[string]any{
 				"type": "local", "command": []any{cmd, "mcp"}, "enabled": true, "timeout": 660000,
 			})
@@ -100,7 +102,7 @@ var agentTargets = []agentTarget{
 	},
 	{
 		name: "kimi", about: "Kimi Code CLI (Moonshot)",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			return append(skillsIn(".agents/skills"),
 				jsonSet(".kimi-code/mcp.json", []string{"mcpServers", "coop"}, map[string]any{
 					"command": cmd, "args": []any{"mcp", "--max-wait", "300s"}, "toolTimeoutMs": 330000,
@@ -110,8 +112,20 @@ var agentTargets = []agentTarget{
 		notes: []string{"Kimi Code starts project MCP servers only after you trust the workspace; its default tool timeout (60 s) is raised to 330 s."},
 	},
 	{
+		name: "dsh", about: "DeepSeek Harness (dsh)",
+		files: func(cmd, root string) []setupFile {
+			return append(skillsIn(".agents/skills"),
+				setupFile{path: dshPluginDir + "/package.json", content: []byte(dshManifest)},
+				setupFile{path: dshPluginDir + "/cordis.patch.yml", content: []byte(dshPatch(absCommand(cmd), root))},
+			)
+		},
+		notes: []string{"MCP servers live in its profile, not in the project: " +
+			"install the folder " + dshPluginDir + " once through Plugins > Add plugin, then start a new session. " +
+			"The plugin is bound to this project folder; set up each project as its own plugin."},
+	},
+	{
 		name: "zcode", about: "ZCode (Z.ai, GLM)",
-		files: func(cmd string) []setupFile {
+		files: func(cmd, _ string) []setupFile {
 			files := append(skillsIn(".agents/skills"),
 				jsonSet(".agents/mcp.json", []string{"mcpServers", "coop"}, map[string]any{
 					"command": cmd, "args": []any{"mcp", "--max-wait", "55s"},
@@ -121,6 +135,60 @@ var agentTargets = []agentTarget{
 		},
 		notes: []string{"ZCode documents no MCP timeout, so coop_wait returns within 55s and the agent calls it again."},
 	},
+}
+
+// DeepSeek Harness has no project MCP config: a local plugin bundle adds the
+// server to the profile. It holds absolute paths of this machine, so it lives
+// in .coop/, which stays out of git.
+const dshPluginDir = ".coop/dsh-plugin"
+
+const dshManifest = `{
+  "name": "@local/dsh-coop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
+`
+
+// dshPatch registers coop mcp for one project. The client's tool timeout
+// (default 60 s) must stay above --max-wait, or coop_wait fails.
+func dshPatch(cmd, root string) string {
+	q := func(s string) string { b, _ := json.Marshal(filepath.ToSlash(s)); return string(b) }
+	return `- insert:
+    - id: coop-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: coop
+        transport: stdio
+        command: ` + q(cmd) + `
+        args: ['mcp', '--dir', ` + q(root) + `, '--max-wait', '120s']
+        cwd: ` + q(root) + `
+        toolCallTimeoutMs: 180000
+        startupTimeoutMs: 20000
+        closeTimeoutMs: 5000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          maxAttempts: 3
+`
+}
+
+// absCommand resolves cmd to an absolute path: an agent started before coop
+// was installed may not have it on its PATH.
+func absCommand(cmd string) string {
+	if filepath.IsAbs(cmd) {
+		return cmd
+	}
+	if p, err := exec.LookPath(cmd); err == nil {
+		if abs, err := filepath.Abs(p); err == nil {
+			return abs
+		}
+	}
+	if p, err := os.Executable(); err == nil {
+		return p
+	}
+	return cmd
 }
 
 const cursorRule = `---
@@ -271,16 +339,19 @@ func cmdSetup(ctx context.Context, env *Env, args []string) error {
 		}
 		t, ok := byName[n]
 		if !ok {
-			return fmt.Errorf("unknown agent %q (known: claude, cursor, codex, gemini, opencode, kimi, zcode, all)", n)
+			return fmt.Errorf("unknown agent %q (known: claude, cursor, codex, gemini, opencode, kimi, zcode, dsh, all)", n)
 		}
 		chosen = append(chosen, t)
 	}
 
 	root := projectRoot(ctx, env.Dir)
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
 	done := map[string]bool{}
 	var notes []string
 	for _, t := range chosen {
-		for _, f := range t.files(*command) {
+		for _, f := range t.files(*command, root) {
 			if done[f.path] {
 				continue
 			}
@@ -290,6 +361,11 @@ func cmdSetup(ctx context.Context, env *Env, args []string) error {
 				return fmt.Errorf("%s: %w", f.path, err)
 			}
 			fmt.Fprintf(env.Stdout, "%-8s %s\n", status, f.path)
+		}
+		if t.name == "dsh" {
+			if err := local.EnsureIgnored(root); err != nil {
+				return err
+			}
 		}
 		for _, n := range t.notes {
 			notes = append(notes, t.about+": "+n)
