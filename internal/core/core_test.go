@@ -86,6 +86,8 @@ func TestHandAndResume(t *testing.T) {
 	post(t, s, agent("B", Hand))
 	refuse(t, s, agent("B", Answer), s.LastSeq, ErrPaused)
 	refuse(t, s, agent("A", Hand), s.LastSeq, ErrAlreadyPaused)
+	refuse(t, s, agent("A", Note), s.LastSeq, ErrPaused) // agents keep quiet in a pause
+	post(t, s, human("A", Note))
 	refuse(t, s, agent("B", Resume), s.LastSeq, ErrHumansOnly)
 	post(t, s, human("B", Resume))
 	refuse(t, s, human("B", Resume), s.LastSeq, ErrNotPaused)

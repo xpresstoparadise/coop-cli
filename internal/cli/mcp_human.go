@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -23,10 +25,13 @@ const humanNote = "This acts as your human. Call it ONLY when your human explici
 func humanTools() []tool {
 	return []tool{
 		{
-			Name:        "coop_approve",
-			Description: "Ask your human to approve the agreed resolution. " + humanNote,
-			InputSchema: obj(map[string]any{}),
-			human:       humanApprove,
+			Name: "coop_approve",
+			Description: "Approve the agreed resolution as your human, in two calls. First call without confirm: returns the resolution text and a confirm token; " +
+				"quote that text in full to your human. Then call again with confirm=<token> to approve. " + humanNote,
+			InputSchema: obj(map[string]any{
+				"confirm": map[string]any{"type": "string", "description": "the token returned by the first call, after you quoted the resolution to your human"},
+			}),
+			human: humanApprove,
 		},
 		{
 			Name:        "coop_resume",
@@ -79,19 +84,56 @@ func postAsHuman(ctx context.Context, sess *session, out *bytes.Buffer, m core.M
 	return "done as your human. " + strings.TrimSpace(out.String()), false
 }
 
-func humanApprove(ctx context.Context, s *mcpServer, _ map[string]any) (string, bool) {
+// humanApprove takes two calls (issue #2): the first returns the resolution
+// and a one-time token, so the agent has the text to show before the second
+// call, with the token, approves. The token is bound to the resolution seq.
+func humanApprove(ctx context.Context, s *mcpServer, a map[string]any) (string, bool) {
 	sess, out, err := s.humanSession(ctx)
 	if err != nil {
 		return refusal(err)
 	}
-	_, _, st, err := sess.load(ctx)
+	_, msgs, st, err := sess.load(ctx)
 	if err != nil {
 		return refusal(err)
 	}
 	if !st.Agreed {
 		return refusal(core.ErrNoResolution)
 	}
-	return postAsHuman(ctx, sess, out, core.Message{Kind: core.Approve, Re: st.Resolution, Body: "approved"})
+	if st.Approved[sess.id.Side] {
+		return refusal(core.ErrAlreadyApproved)
+	}
+	confirm := strings.TrimSpace(str(a["confirm"]))
+	s.mu.Lock()
+	want, wantSeq := s.approveToken, s.approveSeq
+	if confirm != "" && confirm == want && wantSeq == st.Resolution {
+		s.approveToken = ""
+		s.mu.Unlock()
+		return postAsHuman(ctx, sess, out, core.Message{Kind: core.Approve, Re: st.Resolution, Body: "approved"})
+	}
+	token := newToken()
+	s.approveToken, s.approveSeq = token, st.Resolution
+	s.mu.Unlock()
+
+	body := ""
+	for _, m := range msgs {
+		if m.Seq == st.Resolution {
+			body = m.Body
+		}
+	}
+	var b strings.Builder
+	if confirm != "" {
+		b.WriteString("that confirm token is not valid (stale or for another resolution); here is the current one.\n\n")
+	}
+	fmt.Fprintf(&b, "Not approved yet. Quote this resolution #%d (by side %s) to your human in full now, then call coop_approve with confirm=%q.\n\n",
+		st.Resolution, st.ResolutionSide, token)
+	b.WriteString(body)
+	return b.String(), false
+}
+
+func newToken() string {
+	var b [6]byte
+	rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }
 
 func humanResume(ctx context.Context, s *mcpServer, _ map[string]any) (string, bool) {

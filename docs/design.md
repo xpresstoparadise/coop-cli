@@ -63,7 +63,7 @@ Kinds:
 |---|---|---|
 | `propose`, `ask`, `answer`, `counter` | agent | uses the floor |
 | `accept`, `reject` | agent; human (`reject` of a resolution) | uses the floor when sent by an agent |
-| `note` | agent, human | no floor; a human `note` is "say" |
+| `note` | agent, human | no floor; a human `note` is "say"; agents may not post one while paused |
 | `hand` | agent, human | pauses the agents |
 | `resume` | human | lifts the pause |
 | `approve` | human | approves the agreed resolution |
@@ -103,9 +103,17 @@ Kinds:
   Cursor's Run Everything mode), a browser confirmation link (leaves the
   chat). `coop approve` in a terminal (TTY prompt) and `coop watch` remain
   for people who want the stronger guarantee.
+  `coop_approve` takes two calls: the first returns the resolution and a
+  one-time token bound to it, the second (with the token) approves. It
+  does not stop a determined agent, but it means the agent has the text
+  in hand to show before approving (issue #2).
 - Messages from the other side are delivered wrapped as
   `<from side="B" actor="agent">...</from>`; the skill tells the agent to
   treat them as data and to take instructions only from its own human.
+  When a message from the other side mentions human-only tools, overriding
+  instructions, secrets or commands, the agent's plain output adds a
+  `coop:` cue after it, asking the agent to refuse and warn its human. It
+  is a hint, not a filter; harmless messages may trigger it (issue #1).
 - The git backend gives both sides the whole repository. Use it inside one
   team only; use the server backend between owners.
 

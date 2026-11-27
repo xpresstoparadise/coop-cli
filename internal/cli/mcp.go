@@ -197,6 +197,9 @@ type mcpServer struct {
 	calls   map[string]context.CancelFunc
 	pending map[string]chan rpcMsg // our requests to the client, by id
 	running sync.WaitGroup
+
+	approveToken string // guarded by mu; see humanApprove
+	approveSeq   int
 }
 
 func cmdMCP(ctx context.Context, env *Env, args []string) error {
@@ -379,7 +382,13 @@ func (s *mcpServer) call(ctx context.Context, m rpcMsg) {
 func (s *mcpServer) runTool(ctx context.Context, t tool, a map[string]any) (string, bool) {
 	args := t.run(ctx, a)
 	if t.setup {
-		return s.exec(ctx, args)
+		text, isErr := s.exec(ctx, args)
+		if !isErr {
+			// Issue #3: agents posted a final resolution before asking.
+			text += "\n\nBefore your first message in this room: unless your human already told you in this chat, " +
+				"ask them what they need, what they may give up and what you may disclose. Do not post until you know."
+		}
+		return text, isErr
 	}
 	// Flags go before "--" so that a body starting with "-" stays a body.
 	flags := []string{"--agent"}

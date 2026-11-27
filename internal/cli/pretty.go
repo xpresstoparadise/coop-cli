@@ -67,6 +67,11 @@ func (o *out) header(st *core.State, id *local.Identity, actor core.Actor) {
 func (o *out) message(m core.Message, me string, fresh bool) {
 	if !o.on {
 		fmt.Fprint(o.env.Stdout, format(m))
+		if m.Side != me {
+			if cue := manipulationCue(m.Body); cue != "" {
+				o.println(cue)
+			}
+		}
 		return
 	}
 	fmt.Fprint(o.env.Stdout, o.u.Message(m, me, fresh, o.env.width()))

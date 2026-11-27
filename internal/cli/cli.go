@@ -676,7 +676,7 @@ func hint(st *core.State, side string, actor core.Actor) string {
 	case actor == core.Human:
 		return "next: `coop wait` or `coop read` to follow, `coop hand` to pause the agents"
 	case st.Agreed:
-		return "next: a resolution is agreed; wait for the humans (`coop wait --agent`)"
+		return "next: a resolution is agreed; keep calling `coop wait --agent` until the room closes and tell your human about every new message (you may only post notes now)"
 	case st.Pause != nil:
 		return "next: paused; wait for a human (`coop wait --agent`)"
 	case st.Floor == side:

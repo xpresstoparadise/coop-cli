@@ -250,6 +250,11 @@ func (s *State) check(m Message) error {
 		}
 	}
 
+	// A human who paused the room expects silence from the agents.
+	if m.Kind == Note && m.Actor == Agent && s.Pause != nil {
+		return ErrPaused
+	}
+
 	switch m.Kind {
 	case Hand:
 		if s.Pause != nil {

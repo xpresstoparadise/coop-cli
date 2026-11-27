@@ -102,7 +102,7 @@ func TestMCPOpenAndJoin(t *testing.T) {
 	b.send("initialize", map[string]any{"protocolVersion": "2025-11-25"})
 	b.recv()
 	r = b.call("coop_join", map[string]any{"invite": m[1]})
-	if r.IsError || !strings.Contains(r.Content[0].Text, `joined room "Из чата"`) {
+	if r.IsError || !strings.Contains(r.Content[0].Text, `joined room "Из чата"`) || !strings.Contains(r.Content[0].Text, "ask them what they need") {
 		t.Fatalf("coop_join: %+v", r)
 	}
 	r = b.call("coop_status", nil)
