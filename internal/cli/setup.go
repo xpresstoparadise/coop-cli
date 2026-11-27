@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	coopcli "github.com/xpresstoparadise/coop-cli"
+	"github.com/xpresstoparadise/coop-cli/internal/gitroom"
 	"github.com/xpresstoparadise/coop-cli/internal/local"
 )
 
@@ -114,14 +116,15 @@ var agentTargets = []agentTarget{
 	{
 		name: "dsh", about: "DeepSeek Harness (dsh)",
 		files: func(cmd, root string) []setupFile {
+			name := dshName(root)
 			return append(skillsIn(".agents/skills"),
-				setupFile{path: dshPluginDir + "/package.json", content: []byte(dshManifest)},
-				setupFile{path: dshPluginDir + "/cordis.patch.yml", content: []byte(dshPatch(absCommand(cmd), root))},
+				setupFile{path: dshPluginDir + "/package.json", content: []byte(dshManifest(name))},
+				setupFile{path: dshPluginDir + "/cordis.patch.yml", content: []byte(dshPatch(name, absCommand(cmd), root))},
 			)
 		},
 		notes: []string{"MCP servers live in its profile, not in the project: " +
 			"install the folder " + dshPluginDir + " once through Plugins > Add plugin, then start a new session. " +
-			"The plugin is bound to this project folder; set up each project as its own plugin."},
+			"Each project gets its own plugin and server (coop-<project>), seen in every DSH session: use it in its own project."},
 	},
 	{
 		name: "zcode", about: "ZCode (Z.ai, GLM)",
@@ -142,24 +145,41 @@ var agentTargets = []agentTarget{
 // in .coop/, which stays out of git.
 const dshPluginDir = ".coop/dsh-plugin"
 
-const dshManifest = `{
-  "name": "@local/dsh-coop",
+// dshName names the plugin and the MCP server after the project, so several
+// projects can be installed in one DSH profile: coop-<folder>-<hash>, at most
+// 32 characters ([A-Za-z0-9_-]).
+func dshName(root string) string {
+	slug := gitroom.Slugify(filepath.Base(root))
+	if len(slug) > 20 {
+		slug = strings.TrimRight(slug[:20], "-")
+	}
+	if slug == "" {
+		slug = "project"
+	}
+	sum := sha256.Sum256([]byte(filepath.ToSlash(root)))
+	return fmt.Sprintf("coop-%s-%x", slug, sum[:2])
+}
+
+func dshManifest(name string) string {
+	return `{
+  "name": "@local/dsh-` + name + `",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
 }
 `
+}
 
 // dshPatch registers coop mcp for one project. The client's tool timeout
 // (default 60 s) must stay above --max-wait, or coop_wait fails.
-func dshPatch(cmd, root string) string {
+func dshPatch(name, cmd, root string) string {
 	q := func(s string) string { b, _ := json.Marshal(filepath.ToSlash(s)); return string(b) }
 	return `- insert:
-    - id: coop-mcp
+    - id: ` + name + `
       name: '@deepseek-ai/dsh-mcp-client'
       config:
-        serverName: coop
+        serverName: ` + name + `
         transport: stdio
         command: ` + q(cmd) + `
         args: ['mcp', '--dir', ` + q(root) + `, '--max-wait', '120s']
@@ -375,7 +395,7 @@ func cmdSetup(ctx context.Context, env *Env, args []string) error {
 	for _, n := range notes {
 		fmt.Fprintln(env.Stdout, "note: "+n)
 	}
-	fmt.Fprintln(env.Stdout, "restart the agent (or reload its MCP servers) to pick up coop")
+	fmt.Fprintln(env.Stdout, "start a new agent session (or reload its MCP servers) to pick up coop")
 	return nil
 }
 

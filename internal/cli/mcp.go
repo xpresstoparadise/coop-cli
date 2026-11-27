@@ -304,7 +304,7 @@ func (s *mcpServer) handle(ctx context.Context, m rpcMsg) {
 			"protocolVersion": version,
 			"capabilities":    map[string]any{"tools": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "coop", "version": Version},
-			"instructions":    mcpInstructions,
+			"instructions":    mcpInstructions + "\n\nThis coop server works in the project folder " + s.env.Dir + "; use its tools only for work in that folder.",
 		})
 	case "ping":
 		s.reply(m.ID, map[string]any{})

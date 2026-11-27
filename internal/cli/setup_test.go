@@ -76,7 +76,12 @@ func TestSetupAll(t *testing.T) {
 	mustContain(t, patch, "toolCallTimeoutMs: 180000")
 	mustContain(t, patch, `'--max-wait', '120s'`)
 	mustContain(t, patch, filepath.ToSlash(dir))
-	mustContain(t, read(".coop/dsh-plugin/package.json"), `"patch": "./cordis.patch.yml"`)
+	name := dshName(dir)
+	if len(name) > 32 || !strings.HasPrefix(name, "coop-") {
+		t.Fatalf("dsh name %q", name)
+	}
+	mustContain(t, patch, "serverName: "+name)
+	mustContain(t, read(".coop/dsh-plugin/package.json"), `"name": "@local/dsh-`+name+`"`)
 	mustContain(t, read(".gitignore"), ".coop/")
 
 	// Running again changes nothing.
@@ -88,6 +93,16 @@ func TestSetupAll(t *testing.T) {
 	// A file we cannot parse is left alone, with a snippet to add by hand.
 	write(".gemini/settings.json", "{ // comment\n}")
 	mustContain(t, tm.run(1, "setup", "gemini"), `"mcpServers"`)
+}
+
+func TestDSHNameDiffersPerProject(t *testing.T) {
+	a, b := dshName("/home/u/app"), dshName("/work/app")
+	if a == b || !strings.HasPrefix(a, "coop-app-") {
+		t.Fatalf("%q %q", a, b)
+	}
+	if n := dshName("/x/" + strings.Repeat("Очень длинное имя ", 5)); len(n) > 32 {
+		t.Fatalf("too long: %q", n)
+	}
 }
 
 func TestSplitFrontMatterCRLF(t *testing.T) {
